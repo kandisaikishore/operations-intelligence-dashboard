@@ -21,7 +21,8 @@ class ApiApplicationTest {
 
     @Test
     void dashboardIsServedFromApplicationRoot() throws Exception {
-        mvc.perform(get("/"))
+        mvc.perform(get("/")).andExpect(status().isOk());
+        mvc.perform(get("/index.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Operations Intelligence")));
     }
