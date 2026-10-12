@@ -42,3 +42,45 @@ def test_explain_requires_key_when_disabled(monkeypatch):
     diagnosis = analyze_log("Tests run: 2, Failures: 1")
     response = client.post("/explain", json={"log_text":"Tests run: 2, Failures: 1", "diagnosis":diagnosis.model_dump()})
     assert response.status_code == 503
+
+def test_analyze_endpoint_redacts_secrets_before_returning_evidence():
+    response = client.post("/analyze", json={
+        "repository": "demo/api",
+        "run_id": "secret-check",
+        "log_text": "ERROR password=supersecret"
+    })
+    assert response.status_code == 200
+    assert "supersecret" not in response.text
+    assert "[REDACTED]" in response.text
+
+
+def test_explain_recomputes_diagnosis_and_sends_only_redacted_logs(monkeypatch):
+    import json
+    from app import main
+
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"choices": [{"message": {"content": "Likely cause: tests failed."}}]}
+
+    def fake_post(url, **kwargs):
+        captured["payload"] = kwargs["json"]
+        return FakeResponse()
+
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setattr(main.httpx, "post", fake_post)
+    client_supplied_diagnosis = analyze_log("runner exited unexpectedly").model_dump()
+    response = client.post("/explain", json={
+        "log_text": "Tests run: 2, Failures: 1\\npassword=supersecret",
+        "diagnosis": client_supplied_diagnosis
+    })
+
+    assert response.status_code == 200
+    assert response.json()["classification_source"] == "deterministic"
+    prompt = captured["payload"]["messages"][1]["content"]
+    assert '"category":"TEST_FAILURE"' in prompt
+    assert "supersecret" not in prompt
