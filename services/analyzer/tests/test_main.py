@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from app.main import app, analyze_log
+from app.main import app, analyze_log, redact_secrets
 
 client = TestClient(app)
 
@@ -30,3 +30,15 @@ def test_analyze_endpoint_validates_input():
     body = response.json()
     assert body["category"] == "BUILD_CONFIGURATION"
     assert body["recommended_actions"]
+
+def test_redacts_common_secrets():
+    value = redact_secrets("Authorization: Bearer abcdefghijklmnop password=supersecret ghp_abcdefghijklmnopqrstuvwxyz123456")
+    assert "supersecret" not in value
+    assert "ghp_abcdefghijklmnopqrstuvwxyz123456" not in value
+    assert "[REDACTED]" in value
+
+def test_explain_requires_key_when_disabled(monkeypatch):
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    diagnosis = analyze_log("Tests run: 2, Failures: 1")
+    response = client.post("/explain", json={"log_text":"Tests run: 2, Failures: 1", "diagnosis":diagnosis.model_dump()})
+    assert response.status_code == 503
