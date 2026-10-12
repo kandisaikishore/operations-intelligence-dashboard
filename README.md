@@ -4,6 +4,10 @@
 
 **Turn failed CI/CD runs into actionable, evidence-backed fixes.**
 
+## Live Demo
+
+**Deployment URL:** Not verified yet. Add a public URL here once the dashboard service is deployed and checked.
+
 ## Problem and solution
 
 CI failures produce noisy logs and repeated investigations. DFIP classifies common failure types, shows matching evidence, recommends safe next steps, stores incidents, and exposes analytics. Deterministic rules remain the classification source; optional LLM explanations provide a grounded narrative without replacing the diagnosis.
