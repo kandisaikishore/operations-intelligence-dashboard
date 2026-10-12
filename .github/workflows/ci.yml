@@ -10,6 +10,8 @@ permissions:
 jobs:
   analyzer-tests:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/services/analyzer
     defaults:
       run:
         working-directory: services/analyzer
@@ -21,7 +23,7 @@ jobs:
           cache: pip
           cache-dependency-path: services/analyzer/requirements.txt
       - run: pip install -r requirements.txt
-      - run: pytest -q
+      - run: python -m pytest -q
   api-tests:
     runs-on: ubuntu-latest
     services:
