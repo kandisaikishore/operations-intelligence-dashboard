@@ -1,10 +1,13 @@
 package dev.dfip;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.client.RestClient;
@@ -13,8 +16,14 @@ import org.springframework.web.client.RestClient;
 @RequestMapping("/api/v1")
 public class IncidentController {
     private final RestClient analyzer;
-    public IncidentController(@Value("${dfip.analyzer-url:http://localhost:8001}") String analyzerUrl) {
+    private final JdbcTemplate jdbc;
+    private final ObjectMapper mapper;
+
+    public IncidentController(@Value("${dfip.analyzer-url:http://localhost:8001}") String analyzerUrl,
+                              JdbcTemplate jdbc, ObjectMapper mapper) {
         this.analyzer = RestClient.builder().baseUrl(analyzerUrl).build();
+        this.jdbc = jdbc;
+        this.mapper = mapper;
     }
 
     @GetMapping("/health")
@@ -30,11 +39,37 @@ public class IncidentController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "repository, runId and logText are required");
         }
         try {
-            return analyzer.post().uri("/analyze")
+            Map<?, ?> diagnosis = analyzer.post().uri("/analyze")
                 .body(Map.of("repository", request.repository(), "run_id", request.runId(), "log_text", request.logText()))
                 .retrieve().body(Map.class);
+            if (diagnosis == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Analyzer returned an empty response");
+            }
+            long incidentId = jdbc.queryForObject(
+                "INSERT INTO incidents(repository, run_id, category, summary, confidence, evidence, recommended_actions, needs_human_review) " +
+                "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?) " +
+                "ON CONFLICT(repository, run_id) DO UPDATE SET category=EXCLUDED.category, summary=EXCLUDED.summary, " +
+                "confidence=EXCLUDED.confidence, evidence=EXCLUDED.evidence, recommended_actions=EXCLUDED.recommended_actions, " +
+                "needs_human_review=EXCLUDED.needs_human_review RETURNING id",
+                Long.class, request.repository(), request.runId(), diagnosis.get("category"), diagnosis.get("summary"),
+                diagnosis.get("confidence"), json(diagnosis.get("evidence")), json(diagnosis.get("recommended_actions")),
+                diagnosis.get("needs_human_review"));
+            Map<String, Object> response = new HashMap<>();
+            diagnosis.forEach((key, value) -> response.put(String.valueOf(key), value));
+            response.put("incident_id", incidentId);
+            return response;
+        } catch (ResponseStatusException ex) {
+            throw ex;
         } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Analyzer service is unavailable", ex);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Analysis or incident persistence failed", ex);
+        }
+    }
+
+    private String json(Object value) {
+        try {
+            return mapper.writeValueAsString(value == null ? java.util.List.of() : value);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalArgumentException("Could not serialize diagnosis evidence", ex);
         }
     }
 
