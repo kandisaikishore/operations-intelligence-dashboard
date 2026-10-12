@@ -15,6 +15,7 @@ CI failures produce noisy logs and repeated investigations. DFIP classifies comm
 - Persists incidents with repository/run ID deduplication.
 - Incident history: `GET /api/v1/incidents?limit=50` (maximum 200).
 - Analytics: `GET /api/v1/analytics` (totals, review count, average confidence, category counts and 30-day trend).
+- Responsive dashboard at `http://localhost:8080/` with incident KPIs, 30-day activity, category distribution, recent incidents and a manual log-analysis form.
 - Optional LLM explanation grounded in the deterministic diagnosis and redacted log text.
 - GitHub Actions CI tests for Python and Java; Docker Compose for local orchestration.
 
@@ -38,6 +39,7 @@ Spring Boot API ------> PostgreSQL incident history
 docker compose up --build
 ```
 
+- Dashboard: http://localhost:8080/
 - Analyzer docs: http://localhost:8001/docs
 - API health: http://localhost:8080/api/v1/health
 - Actuator health: http://localhost:8080/actuator/health
@@ -86,9 +88,9 @@ mvn test
 
 1. Signed GitHub webhook ingestion and least-privilege permissions.
 2. Secret scanning/redaction before persistence and LLM calls.
-3. Frontend dashboard with charts and verified recovery outcomes.
-4. Deploy with managed PostgreSQL and a secret manager.
-5. Add evaluation datasets to measure classification accuracy.
+3. Deploy with managed PostgreSQL, TLS, authentication and a secret manager.
+4. Add evaluation datasets and regression thresholds to measure classification accuracy.
+5. Add verified recovery outcomes and operational SLO tracking.
 
 ## License
 
