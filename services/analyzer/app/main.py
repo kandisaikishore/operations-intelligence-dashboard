@@ -66,7 +66,7 @@ def health():
 
 @app.post("/analyze", response_model=Diagnosis)
 def analyze(request: AnalyzeRequest):
-    return analyze_log(request.log_text)
+    return analyze_log(redact_secrets(request.log_text))
 
 @app.post("/explain")
 def explain(request: ExplainRequest):
