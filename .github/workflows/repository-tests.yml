@@ -1,0 +1,49 @@
+name: Repository Tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Java tests
+        shell: bash
+        run: |
+          set -e
+          if [ -f pom.xml ]; then mvn --batch-mode test
+          elif [ -x ./gradlew ]; then ./gradlew test
+          elif [ -f build.gradle ] || [ -f build.gradle.kts ]; then echo "Gradle wrapper missing; skipped."
+          else echo "No root Java build manifest found."; fi
+      - name: Python tests
+        shell: bash
+        run: |
+          set -e
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -d tests ] || find . -maxdepth 2 -name 'test_*.py' -print -quit | grep -q .; then pip install pytest; pytest -q
+          else echo "No Python tests found."; fi
+      - name: Node tests and build
+        shell: bash
+        run: |
+          set -e
+          if [ -f package.json ]; then
+            if [ -f package-lock.json ]; then npm ci; else npm install; fi
+            npm test --if-present
+            npm run build --if-present
+          else echo "No root package.json found."; fi
