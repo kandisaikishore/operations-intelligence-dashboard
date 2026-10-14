@@ -1,68 +1,50 @@
-# DevOps Failure Intelligence Platform
+# Operations Intelligence Dashboard
 
-[![CI](https://github.com/saikishore2410/operations-intelligence-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/saikishore2410/operations-intelligence-dashboard/actions/workflows/ci.yml) ![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk) ![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python) ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker) [![Issues](https://img.shields.io/github/issues/saikishore2410/operations-intelligence-dashboard)](https://github.com/saikishore2410/operations-intelligence-dashboard/issues)
+[![Java 17](https://img.shields.io/badge/Java-17-orange?logo=openjdk)](https://www.java.com/) [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue?logo=python)](https://www.python.org/) [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://docs.docker.com/compose/) [![Source](https://img.shields.io/badge/Source-GitHub-181717?logo=github)](https://github.com/kandisaikishore/operations-intelligence-dashboard)
 
-**Turn noisy CI/CD failures into evidence-backed diagnoses and practical next steps.**
+An operations-focused dashboard project with a Java API, Python analysis service, PostgreSQL, and Docker Compose. The repository is intended to bring operational signals and service information into one place; verify the current services and endpoints from the checked-in configuration before extending it.
 
-DFIP combines a Java Spring Boot API, a Python FastAPI analyzer, and PostgreSQL persistence to classify common pipeline failures, show supporting log evidence, and help teams track incident patterns.
+## Project overview
 
-## Why it matters
-Build and deployment failures often require engineers to scan long logs and repeat the same investigation. DFIP shortens the first diagnostic pass while keeping recovery decisions under human control.
+- Organize operational data for easier inspection
+- Provide a dashboard and API layer for service workflows
+- Use container orchestration for local development
+- Establish a foundation for operational analytics and observability
 
-## Key capabilities
-- Deterministic classification for dependency, test, compilation/build, Docker, network, and unknown failures.
-- Relevant log evidence, confidence information, suggested actions, and human-review guidance.
-- Incident history with repository/run deduplication.
-- Analytics for totals, category counts, review counts, confidence, and recent trends.
-- Responsive dashboard with KPIs, incident history, category distribution, and manual log analysis.
-- Optional LLM explanations grounded in deterministic diagnosis.
-- GitHub Actions checks and Docker Compose orchestration.
+## Technology stack
 
-## Architecture
-    Dashboard / GitHub Actions
-              |
-              v
-    Spring Boot API ------> PostgreSQL
-              |
-              v
-    Python FastAPI Analyzer
-      |-- deterministic classification
-      |-- log evidence and redaction
-      +-- optional LLM explanation
-
-## Stack
-Java 17, Spring Boot, Python 3.11, FastAPI, PostgreSQL, Docker Compose, GitHub Actions, optional OpenAI-compatible LLM endpoint.
+- Java 17 / Spring Boot
+- Python 3.11 / FastAPI
+- PostgreSQL
+- Docker Compose
+- GitHub Actions
 
 ## Quick start
-    git clone https://github.com/saikishore2410/operations-intelligence-dashboard.git
-    cd operations-intelligence-dashboard
-    docker compose up --build
 
-Local endpoints:
-- Dashboard/API: http://localhost:8080/
-- API health: http://localhost:8080/api/v1/health
-- Incident history: http://localhost:8080/api/v1/incidents
-- Analytics: http://localhost:8080/api/v1/analytics
-- Analyzer docs: http://localhost:8001/docs
+```bash
+git clone https://github.com/kandisaikishore/operations-intelligence-dashboard.git
+cd operations-intelligence-dashboard
+docker compose up --build
+```
 
-## Tests
-    cd services/analyzer
-    pip install -r requirements.txt
-    pytest -q
-    cd ../api
-    mvn test
+Review `docker-compose.yml` and service configuration for the required environment variables and ports. Configure secrets locally and do not commit credentials. If a service fails to start, inspect the container logs with `docker compose logs --follow`.
 
-## Limitations and safety
-Diagnostics are advisory; review recommendations before changing production workloads. Unknown failures need human investigation. Signed GitHub webhook ingestion and authenticated automatic log retrieval are not yet implemented. Redaction is best-effort; never submit secrets or sensitive logs. A live deployment URL is not included because one has not been verified.
+## Repository layout
 
-## Roadmap
-1. Signed webhook ingestion with least-privilege permissions.
-2. Stronger redaction before persistence or model calls.
-3. Evaluation datasets and classification regression thresholds.
-4. Recovery outcome tracking and operational SLO reporting.
+The repository includes a `services/` directory and a `docker-compose.yml` file. Consult the service folders for individual build instructions, routes, and tests.
+
+## Validation
+
+Run the tests documented in each service directory. Also verify that containers reach a healthy state, the dashboard loads, API error responses are understandable, and persistent data behaves as expected across restarts.
+
+## Security and operational considerations
+
+Before production deployment, configure authentication and authorization, secure service-to-service communication, health checks, resource limits, backup/restore, and log redaction. Do not send secrets or sensitive operational logs to external services without an approved policy.
 
 ## Contributing
-Include reproduction steps, expected behaviour, and test results with proposed changes.
+
+Open issues with reproduction steps and relevant logs after redacting credentials. Pull requests should describe the behaviour changed and the tests performed.
 
 ## License
-MIT
+
+Review the repository's license file before reuse or redistribution.
