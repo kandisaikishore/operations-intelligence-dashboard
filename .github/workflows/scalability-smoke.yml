@@ -1,0 +1,96 @@
+name: Scalability smoke checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "41 2 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scalability-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check repository size and accidental large files
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Tracked file count: $(git ls-files | wc -l)"
+          echo "Largest tracked files (bytes):"
+          git ls-files -z | xargs -0 -r du -b 2>/dev/null | sort -nr | head -20 || true
+          if git ls-files | grep -E '(^|/)(\.env|\.env\..+)$' | grep -vE '(^|/)\.env\.example$'; then
+            echo "Potential environment secret file is tracked; review it before release." >&2
+            exit 1
+          fi
+
+      - name: Check Dockerfile configuration when present
+        if: hashFiles('Dockerfile') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq '^FROM ' Dockerfile
+          echo "Dockerfile has a base image declaration."
+          if grep -Eq '^(USER|user) ' Dockerfile; then
+            echo "A runtime USER directive is present."
+          else
+            echo "::warning::Dockerfile has no USER directive; assess non-root execution."
+          fi
+
+      - name: Report compose service and health-check declarations
+        if: hashFiles('docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -nE '^[[:space:]]{0,6}(services:|[A-Za-z0-9_-]+:|healthcheck:|depends_on:|deploy:|resources:)' docker-compose.yml docker-compose.yaml compose.yml compose.yaml 2>/dev/null || true
+          echo "Compose configuration discovered; validate actual deployment limits in staging."
+
+      - name: Check Node package manifests when present
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate Node package scripts
+        if: hashFiles('package.json') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(!p.name) throw new Error('package.json must declare a package name'); console.log(JSON.stringify({name:p.name, scripts:Object.keys(p.scripts||{})}, null, 2))"
+          if [[ -f package-lock.json ]]; then npm ci --ignore-scripts --no-audit --no-fund; fi
+          npm run --if-present lint
+          npm run --if-present build
+
+      - name: Validate Python syntax when present
+        if hashFiles('**/*.py') != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile Python sources
+        if: hashFiles('**/*.py') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q .
+
+      - name: Check Java source compilation when no build system exists
+        if: hashFiles('**/*.java') != '' && hashFiles('pom.xml', 'build.gradle', 'build.gradle.kts', 'gradlew') == ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk-headless
+          mkdir -p /tmp/java-classes
+          mapfile -d '' sources < <(find . -type d \( -name .git -o -name node_modules -o -name target \) -prune -o -type f -name '*.java' -print0)
+          if (("${#sources[@]}" > 0)); then javac -Xlint:all -d /tmp/java-classes "${sources[@]}"; fi
